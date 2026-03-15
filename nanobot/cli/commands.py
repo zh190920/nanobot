@@ -130,7 +130,7 @@ def _render_interactive_ansi(render_fn) -> str:
     return capture.get()
 
 
-def _print_agent_response(response: str, render_markdown: bool) -> None:
+async def _print_agent_response(response: str, render_markdown: bool) -> None:
     """Render assistant response with consistent terminal styling."""
     console = _make_console()
     content = response or ""
@@ -668,11 +668,12 @@ def agent(
         async def run_once():
             with _thinking_ctx():
                 response = await agent_loop.process_direct(message, session_id, on_progress=_cli_progress)
-            final_res = _print_agent_response(response, render_markdown=markdown)
+            res = await _print_agent_response(response, render_markdown=markdown)
             await agent_loop.close_mcp()
-            return final_res
+            return res
 
-        asyncio.run(run_once())
+        return asyncio.run(run_once())
+        
     else:
         # Interactive mode — route through bus like other channels
         from nanobot.bus.events import InboundMessage
@@ -762,7 +763,7 @@ def agent(
                             await turn_done.wait()
 
                         if turn_response:
-                            res = _print_agent_response(turn_response[0], render_markdown=markdown)
+                            _ = await _print_agent_response(turn_response[0], render_markdown=markdown)
                     except KeyboardInterrupt:
                         _restore_terminal()
                         console.print("\nGoodbye!")

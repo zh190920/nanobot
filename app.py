@@ -136,8 +136,9 @@ async def ask(
                 context += f"\n\n# 文件：{fname}\n" + fpath.read_text(encoding="utf-8", errors="ignore")
     # 没有文件时就是普通AI问答
     full_message = (context + "\n\n" + message) if context else message
-    result = await run_agent_safe(message=full_message, username=username, logs=False)
-    return JSONResponse({"status": "ok", "reply": result if result else "AI已处理，请检查历史"})
+    result = run_agent_safe(message=full_message, username=username, logs=False)
+    # return {"status": "ok", "reply": result if result else "AI已处理，请检查历史"}
+    return result
 # 4. 咨询AI接口
 @app.post("/ask")
 async def ask(
@@ -158,7 +159,8 @@ async def ask(
     # 让 run_agent 返回 AI 回复内容（需在 commands.py/run_agent 支持返回）
     result = run_agent_safe(message=full_message, username=username, logs=True)
     # 假设 run_agent 返回 AI 回复字符串，否则需调整
-    return JSONResponse({"status": "ok", "reply": result if result else "AI已处理，请检查历史"})
+    # return JSONResponse({"status": "ok", "reply": result if result else "AI已处理，请检查历史"})
+    return result
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
