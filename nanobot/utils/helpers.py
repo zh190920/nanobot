@@ -169,32 +169,38 @@ def estimate_prompt_tokens_chain(
         return int(estimated), "tiktoken"
     return 0, "none"
 
+def sync_workspace_templates(workspace: Path, silent: bool = False, username: str = None) -> list[str]:
+    """Copy missing template files into the workspace (idempotent). 支持用户目录。"""
+    # 直接定位 nanobot/templates 目录
+    tpl = Path(__file__).parent.parent / "templates"
 
-def sync_workspace_templates(workspace: Path, silent: bool = False) -> list[str]:
-    """Sync bundled templates to workspace. Only creates missing files."""
-    from importlib.resources import files as pkg_files
-    try:
-        tpl = pkg_files("nanobot") / "templates"
-    except Exception:
-        return []
-    if not tpl.is_dir():
-        return []
+    added = []
 
-    added: list[str] = []
+    # 如果指定 username，则所有模板写入 users/{username}/ 下
+    if username:
+        user_workspace = workspace / "users" / username
+        user_workspace.mkdir(parents=True, exist_ok=True)
+    else:
+        user_workspace = workspace
 
-    def _write(src, dest: Path):
+    def _write(src: Path | None, dest: Path):
+        # 确保父目录存在
+        dest.parent.mkdir(parents=True, exist_ok=True)
         if dest.exists():
             return
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(src.read_text(encoding="utf-8") if src else "", encoding="utf-8")
-        added.append(str(dest.relative_to(workspace)))
+        if src and src.exists():
+            dest.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+        else:
+            dest.write_text("", encoding="utf-8")
+        added.append(str(dest.relative_to(user_workspace)))
 
     for item in tpl.iterdir():
         if item.name.endswith(".md") and not item.name.startswith("."):
-            _write(item, workspace / item.name)
-    _write(tpl / "memory" / "MEMORY.md", workspace / "memory" / "MEMORY.md")
-    _write(None, workspace / "memory" / "HISTORY.md")
-    (workspace / "skills").mkdir(exist_ok=True)
+            _write(item, user_workspace / item.name)
+    memory_tpl = tpl / "memory" / "MEMORY.md"
+    _write(memory_tpl if memory_tpl.exists() else None, user_workspace / "memory" / "MEMORY.md")
+    _write(None, user_workspace / "memory" / "HISTORY.md")
+    (user_workspace / "skills").mkdir(exist_ok=True)
 
     if added and not silent:
         from rich.console import Console

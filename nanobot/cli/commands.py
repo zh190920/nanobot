@@ -139,6 +139,7 @@ def _print_agent_response(response: str, render_markdown: bool) -> None:
     console.print(f"[cyan]{__logo__} nanobot[/cyan]")
     console.print(body)
     console.print()
+    return body
 
 
 async def _print_interactive_line(text: str) -> None:
@@ -591,6 +592,7 @@ def agent(
     session_id: str = typer.Option("cli:direct", "--session", "-s", help="Session ID"),
     workspace: str | None = typer.Option(None, "--workspace", "-w", help="Workspace directory"),
     config: str | None = typer.Option(None, "--config", "-c", help="Config file path"),
+    username: str = typer.Option(None, "--username", "-u", help="Username for user data isolation"),
     markdown: bool = typer.Option(True, "--markdown/--no-markdown", help="Render assistant output as Markdown"),
     logs: bool = typer.Option(False, "--logs/--no-logs", help="Show nanobot runtime logs during chat"),
 ):
@@ -604,7 +606,11 @@ def agent(
 
     config = _load_runtime_config(config, workspace)
     _print_deprecated_memory_window_notice(config)
-    sync_workspace_templates(config.workspace_path)
+    # 初始化用户目录下的 memory/HISTORY.md、MEMORY.md
+    if username:
+        sync_workspace_templates(config.workspace_path, username=username)
+    else:
+        sync_workspace_templates(config.workspace_path)
 
     bus = MessageBus()
     provider = _make_provider(config)
@@ -618,10 +624,17 @@ def agent(
     else:
         logger.disable("nanobot")
 
+    # 用户目录隔离：如指定 username，则所有数据写入 workspace/users/{username}/
+    if username:
+        user_workspace = config.workspace_path / "users" / username
+        user_workspace.mkdir(parents=True, exist_ok=True)
+    else:
+        user_workspace = config.workspace_path
+
     agent_loop = AgentLoop(
         bus=bus,
         provider=provider,
-        workspace=config.workspace_path,
+        workspace=user_workspace,
         model=config.agents.defaults.model,
         max_iterations=config.agents.defaults.max_tool_iterations,
         context_window_tokens=config.agents.defaults.context_window_tokens,
@@ -655,8 +668,9 @@ def agent(
         async def run_once():
             with _thinking_ctx():
                 response = await agent_loop.process_direct(message, session_id, on_progress=_cli_progress)
-            _print_agent_response(response, render_markdown=markdown)
+            final_res = _print_agent_response(response, render_markdown=markdown)
             await agent_loop.close_mcp()
+            return final_res
 
         asyncio.run(run_once())
     else:
@@ -748,7 +762,7 @@ def agent(
                             await turn_done.wait()
 
                         if turn_response:
-                            _print_agent_response(turn_response[0], render_markdown=markdown)
+                            res = _print_agent_response(turn_response[0], render_markdown=markdown)
                     except KeyboardInterrupt:
                         _restore_terminal()
                         console.print("\nGoodbye!")
@@ -1064,5 +1078,51 @@ def _login_github_copilot() -> None:
         raise typer.Exit(1)
 
 
+# if __name__ == "__main__":
+#     app()
+
+# 允许直接通过函数调用启动 agent
+def run_agent(
+    message: str = None,
+    session_id: str = "cli:direct",
+    workspace: str | None = None,
+    config: str | None = None,
+    username: str = None,
+    markdown: bool = True,
+    logs: bool = False,
+):
+    """直接以函数方式运行 agent，参数同 CLI。"""
+    # 复用 CLI agent 逻辑
+    return agent(
+        message=message,
+        session_id=session_id,
+        workspace=workspace,
+        config=config,
+        username=username,
+        markdown=markdown,
+        logs=logs,
+    )
+
+import asyncio
+
+def run_agent_safe(*args, **kwargs):
+    try:
+        loop = asyncio.get_running_loop()
+        # 已在事件循环中，必须用线程或 create_task
+        import nest_asyncio
+        nest_asyncio.apply()
+        coro = run_agent(*args, **kwargs)
+        if asyncio.iscoroutine(coro):
+            return loop.create_task(coro)
+        return coro
+    except RuntimeError:
+        # 不在事件循环中，直接 run
+        return run_agent(*args, **kwargs)
+
 if __name__ == "__main__":
-    app()
+    # 示例：直接运行本文件即可测试
+    run_agent_safe(
+        message="用户又改名叫王浩浩，这是用户的重要特征",
+        username="lixiang",
+        logs=True,
+    )

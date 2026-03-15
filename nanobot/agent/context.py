@@ -72,29 +72,34 @@ Skills with available="false" need dependencies installed first - you can try in
 - Use file tools when they are simpler or more reliable than shell commands.
 """
 
+        # 检查是否为用户目录
+        user_hint = ""
+        if "/users/" in workspace_path.replace("\\", "/"):
+            user_hint = " (user-specific)"
+
         return f"""# nanobot 🐈
 
-You are nanobot, a helpful AI assistant.
+    You are nanobot, a helpful AI assistant.
 
-## Runtime
-{runtime}
+    ## Runtime
+    {runtime}
 
-## Workspace
-Your workspace is at: {workspace_path}
-- Long-term memory: {workspace_path}/memory/MEMORY.md (write important facts here)
-- History log: {workspace_path}/memory/HISTORY.md (grep-searchable). Each entry starts with [YYYY-MM-DD HH:MM].
-- Custom skills: {workspace_path}/skills/{{skill-name}}/SKILL.md
+    ## Workspace
+    Your workspace is at: {workspace_path}{user_hint}
+    - Long-term memory: {{workspace}}/memory/MEMORY.md (write important facts here, user-specific if in users/{{username}})
+    - History log: {{workspace}}/memory/HISTORY.md (grep-searchable, user-specific if in users/{{username}}). Each entry starts with [YYYY-MM-DD HH:MM].
+    - Custom skills: {{workspace}}/skills/{{skill-name}}/SKILL.md
 
-{platform_policy}
+    {platform_policy}
 
-## nanobot Guidelines
-- State intent before tool calls, but NEVER predict or claim results before receiving them.
-- Before modifying a file, read it first. Do not assume files or directories exist.
-- After writing or editing a file, re-read it if accuracy matters.
-- If a tool call fails, analyze the error before retrying with a different approach.
-- Ask for clarification when the request is ambiguous.
+    ## nanobot Guidelines
+    - State intent before tool calls, but NEVER predict or claim results before receiving them.
+    - Before modifying a file, read it first. Do not assume files or directories exist.
+    - After writing or editing a file, re-read it if accuracy matters.
+    - If a tool call fails, analyze the error before retrying with a different approach.
+    - Ask for clarification when the request is ambiguous.
 
-Reply directly with text for conversations. Only use the 'message' tool to send to a specific chat channel."""
+    Reply directly with text for conversations. Only use the 'message' tool to send to a specific chat channel."""
 
     @staticmethod
     def _build_runtime_context(channel: str | None, chat_id: str | None) -> str:
