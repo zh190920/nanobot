@@ -139,7 +139,7 @@ async def _print_agent_response(response: str, render_markdown: bool) -> None:
     console.print(f"[cyan]{__logo__} nanobot[/cyan]")
     console.print(body)
     console.print()
-    return body
+    return content
 
 
 async def _print_interactive_line(text: str) -> None:
